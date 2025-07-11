@@ -351,6 +351,7 @@ mod tests {
     use super::*;
     use core::ops::Not;
 
+    const PERIODS_FOR_TEST: u32 = 50u32;
     static TEST_ENABLED: AtomicBool = AtomicBool::new(false);
     static TEST_ON_OFF: AtomicBool = AtomicBool::new(false);
     static TEST_PERIOD: AtomicU32 = AtomicU32::new(0);
@@ -436,7 +437,7 @@ mod tests {
         let channel0_period = sim_timer_freq / channel0_freq;
         let mut expected_period = 1;
 
-        for i in 0..(2 * channel0_period) {
+        for i in 0..(PERIODS_FOR_TEST * channel0_period) {
             spwm.irq_handler();
 
             if i == channel0_period {
@@ -472,7 +473,7 @@ mod tests {
         let channel0_on_ticks = channel0_period / 100 * u32::from(channel0_duty_cycle);
         let mut expected_period = 0;
 
-        for i in 0..(2 * channel0_period - 1) {
+        for i in 0..(PERIODS_FOR_TEST * channel0_period - 1) {
             spwm.irq_handler();
             // |-----|___________|-----|____________
             // ^ - check for ON state
@@ -512,7 +513,7 @@ mod tests {
         let channel0_period = sim_timer_freq / channel0_freq;
         let mut expected_period = 1;
 
-        for i in 0..(2 * channel0_period) {
+        for i in 0..(PERIODS_FOR_TEST * channel0_period) {
             spwm.irq_handler();
 
             if i == channel0_period {
@@ -549,7 +550,7 @@ mod tests {
         let channel0_period = sim_timer_freq / channel0_freq;
         let expected_period = 0;
 
-        for i in 0..(2 * channel0_period) {
+        for i in 0..(PERIODS_FOR_TEST * channel0_period) {
             spwm.irq_handler();
 
             if i == channel0_period {
