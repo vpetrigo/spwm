@@ -1,7 +1,12 @@
 #![no_std]
 
-use core::cell::OnceCell;
+mod channel;
+
+use channel::SpwmChannelBuilder;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+use crate::channel::SpwmChannelFreqHzBuildState;
+pub use channel::SpwmChannel;
 
 pub enum SpwmState {
     On,
@@ -14,6 +19,7 @@ pub enum SpwmError {
     InvalidFrequency,
     InvalidDutyCycle,
     CallbackSetError,
+    NoChannelSlotAvailable,
 }
 
 pub type OnOffCallback = fn(&SpwmState);
@@ -22,29 +28,25 @@ pub type PeriodCallback = fn();
 pub type TimerStartCallback = fn();
 pub type TimerStopCallback = fn();
 
+pub type ChannelId = usize;
+
 const FREQUENCY_DIFFERENCE_REQUIRED: u32 = 100;
-const MAX_DUTY_CYCLE: u8 = 100;
 
 #[derive(Default)]
-struct SpwmChannel {
-    period_ticks: AtomicU32,
-    on_ticks: AtomicU32,
-    update_on_ticks: AtomicU32,
-    counter: AtomicU32,
-    enabled: AtomicBool,
-    on_off_callback: OnceCell<OnOffCallback>,
-    period_callback: OnceCell<PeriodCallback>,
+struct ChannelSlot {
+    channel: Option<SpwmChannel>,
 }
 
-pub struct Spwm {
+pub struct Spwm<const N: usize> {
     active: AtomicBool,
+    channels: [SpwmChannel; N],
+    upd_channels: [ChannelSlot; N],
     freq_hz: u32,
-    channels: [SpwmChannel; 4],
     start_callback: Option<TimerStartCallback>,
     stop_callback: Option<TimerStopCallback>,
 }
 
-impl Spwm {
+impl<const N: usize> Spwm<N> {
     #[must_use]
     pub fn new(
         freq_hz: u32,
@@ -55,9 +57,26 @@ impl Spwm {
             active: AtomicBool::new(false),
             freq_hz,
             channels: core::array::from_fn(|_| SpwmChannel::default()),
+            upd_channels: core::array::from_fn(|_| ChannelSlot::default()),
             start_callback,
             stop_callback,
         }
+    }
+
+    pub fn create_channel(&self) -> SpwmChannelBuilder<SpwmChannelFreqHzBuildState> {
+        SpwmChannelBuilder::new(self.freq_hz)
+    }
+
+    pub fn register_channel(&mut self, channel: SpwmChannel) -> Result<ChannelId, SpwmError> {
+        for (i, slot) in self.upd_channels.iter_mut().enumerate() {
+            if slot.channel.is_none() {
+                slot.channel = Some(channel);
+
+                return Ok(i);
+            }
+        }
+
+        Err(SpwmError::NoChannelSlotAvailable)
     }
 
     ///
@@ -96,19 +115,19 @@ impl Spwm {
     /// # Errors
     /// - `SpwmError::InvalidChannel` - specified PWM channel index is out of range
     pub fn set_channel_duty_cycle(&self, channel: usize, duty_cycle: u8) -> Result<(), SpwmError> {
-        if channel >= self.channels.len() {
-            return Err(SpwmError::InvalidChannel);
-        }
-
-        if duty_cycle > MAX_DUTY_CYCLE {
-            return Err(SpwmError::InvalidDutyCycle);
-        }
-
-        let pwm_channel = &self.channels[channel];
-        let current_period = pwm_channel.period_ticks.load(Ordering::Relaxed);
-        let on_time = current_period / 100 * u32::from(duty_cycle);
-
-        pwm_channel.update_on_ticks(on_time);
+        // if channel >= self.channels.len() {
+        //     return Err(SpwmError::InvalidChannel);
+        // }
+        //
+        // if duty_cycle > MAX_DUTY_CYCLE {
+        //     return Err(SpwmError::InvalidDutyCycle);
+        // }
+        //
+        // let pwm_channel = &self.channels[channel];
+        // let current_period = pwm_channel.period_ticks.load(Ordering::Relaxed);
+        // let on_time = current_period / 100 * u32::from(duty_cycle);
+        //
+        // pwm_channel.update_on_ticks(on_time);
 
         Ok(())
     }
@@ -120,7 +139,7 @@ impl Spwm {
     ///
     /// # Parameters
     /// - `channel`: The index of the channel for which the callback is being set. The index must
-    ///              be within the range of available channels.
+    ///   be within the range of available channels.
     /// - `callback`: The callback function of type `OnOffCallback` to handle the on/off state changes.
     ///
     /// # Returns
@@ -148,7 +167,7 @@ impl Spwm {
     ///
     /// # Parameters
     /// - `channel`: The index of the channel for which the period callback is to be set.
-    ///              Must be less than the total number of channels.
+    ///   Must be less than the total number of channels.
     /// - `callback`: The callback function that will be executed when the channel's period is updated.
     ///
     /// # Returns
@@ -187,9 +206,9 @@ impl Spwm {
             return Err(SpwmError::InvalidChannel);
         }
 
-        loop {
-            let current = false;
+        let mut current = self.active.load(Ordering::Relaxed);
 
+        loop {
             match self.active.compare_exchange_weak(
                 current,
                 true,
@@ -197,11 +216,7 @@ impl Spwm {
                 Ordering::SeqCst,
             ) {
                 Ok(_) => break,
-                Err(value) => {
-                    if value {
-                        return Ok(());
-                    }
-                }
+                Err(value) => current = value,
             }
         }
 
@@ -277,72 +292,18 @@ impl Spwm {
 
                     let on_ticks = channel.on_ticks.load(Ordering::Relaxed);
 
-                    if on_ticks != 0 {
-                        if let Some(callback) = channel.on_off_callback.get() {
-                            callback(&SpwmState::On);
-                        }
+                    if on_ticks != 0
+                        && let Some(callback) = channel.on_off_callback.get()
+                    {
+                        callback(&SpwmState::On);
                     }
-                } else if current_ticks == on_ticks {
-                    if let Some(callback) = channel.on_off_callback.get() {
-                        callback(&SpwmState::Off);
-                    }
+                } else if current_ticks == on_ticks
+                    && let Some(callback) = channel.on_off_callback.get()
+                {
+                    callback(&SpwmState::Off);
                 }
             }
         }
-    }
-}
-
-impl SpwmChannel {
-    fn enable(&self) {
-        self.enabled.store(true, Ordering::SeqCst);
-
-        if let Some(callback) = self.on_off_callback.get()
-            && self.on_ticks.load(Ordering::Relaxed) != 0
-        {
-            callback(&SpwmState::On);
-        }
-    }
-
-    fn disable(&self) {
-        self.enabled.store(false, Ordering::SeqCst);
-        self.counter.store(0, Ordering::SeqCst);
-
-        if let Some(callback) = self.on_off_callback.get() {
-            callback(&SpwmState::Off);
-        }
-    }
-
-    fn counter_tick(&self) -> u32 {
-        self.counter.fetch_add(1, Ordering::SeqCst)
-    }
-
-    fn counter_reset(&self) {
-        self.counter.store(0, Ordering::SeqCst);
-    }
-
-    fn set_period_ticks(&self, period_ticks: u32) {
-        self.period_ticks.store(period_ticks, Ordering::SeqCst);
-    }
-
-    fn update_on_ticks(&self, on_ticks: u32) {
-        if self.enabled.load(Ordering::Relaxed) {
-            self.update_on_ticks.store(on_ticks, Ordering::SeqCst);
-        } else {
-            self.on_ticks.store(on_ticks, Ordering::SeqCst);
-            self.update_on_ticks.store(on_ticks, Ordering::SeqCst);
-        }
-    }
-
-    fn set_on_ticks(&self, on_ticks: u32) {
-        self.on_ticks.store(on_ticks, Ordering::SeqCst);
-    }
-
-    fn set_on_off_callback(&self, on_off_callback: OnOffCallback) -> Result<(), OnOffCallback> {
-        self.on_off_callback.set(on_off_callback)
-    }
-
-    fn set_period_callback(&self, period_callback: PeriodCallback) -> Result<(), PeriodCallback> {
-        self.period_callback.set(period_callback)
     }
 }
 
@@ -377,7 +338,7 @@ mod tests {
 
     #[test]
     fn construct_spwm() {
-        let spwm = Spwm::new(100_000, None, None);
+        let spwm = Spwm::<4>::new(100_000, None, None);
         let result = spwm.set_channel_frequency(0, 1000);
         assert!(
             result.is_ok(),
@@ -402,7 +363,7 @@ mod tests {
     fn start_stop_spwm() {
         TEST_ENABLED.store(false, Ordering::Relaxed);
 
-        let spwm = Spwm::new(100_000, Some(start_test_callback), Some(stop_test_callback));
+        let spwm = Spwm::<4>::new(100_000, Some(start_test_callback), Some(stop_test_callback));
         let _ = spwm.set_channel_frequency(0, 1000);
         let _ = spwm.set_channel_duty_cycle(0, 50);
         let _ = spwm.enable(0);
@@ -424,7 +385,7 @@ mod tests {
         let channel0_freq = 1000;
         let channel0_duty_cycle = 100;
 
-        let spwm = Spwm::new(sim_timer_freq, None, None);
+        let spwm = Spwm::<4>::new(sim_timer_freq, None, None);
         let _ = spwm.set_channel_frequency(0, channel0_freq);
         let _ = spwm.set_channel_duty_cycle(0, channel0_duty_cycle);
         let result = spwm.set_channel_on_off_callback(0, on_off_test_callback);
@@ -459,7 +420,7 @@ mod tests {
         let channel0_freq = 1000;
         let channel0_duty_cycle = 50;
 
-        let spwm = Spwm::new(sim_timer_freq, None, None);
+        let spwm = Spwm::<4>::new(sim_timer_freq, None, None);
         let _ = spwm.set_channel_frequency(0, channel0_freq);
         let _ = spwm.set_channel_duty_cycle(0, channel0_duty_cycle);
         let result = spwm.set_channel_on_off_callback(0, on_off_test_callback);
@@ -500,7 +461,7 @@ mod tests {
         let channel0_freq = 1000;
         let channel0_duty_cycle = 0;
 
-        let spwm = Spwm::new(sim_timer_freq, None, None);
+        let spwm = Spwm::<4>::new(sim_timer_freq, None, None);
         let _ = spwm.set_channel_frequency(0, channel0_freq);
         let _ = spwm.set_channel_duty_cycle(0, channel0_duty_cycle);
         let result = spwm.set_channel_on_off_callback(0, on_off_test_callback);
@@ -535,7 +496,7 @@ mod tests {
         let channel0_freq = 1000;
         let channel0_duty_cycle = 50;
 
-        let spwm = Spwm::new(sim_timer_freq, None, None);
+        let spwm = Spwm::<4>::new(sim_timer_freq, None, None);
         let _ = spwm.set_channel_frequency(0, channel0_freq);
         let _ = spwm.set_channel_duty_cycle(0, channel0_duty_cycle);
         let result = spwm.set_channel_on_off_callback(0, on_off_test_callback);
@@ -561,5 +522,28 @@ mod tests {
 
         assert_eq!(TEST_PERIOD.load(Ordering::Relaxed), expected_period);
         assert!(TEST_ON_OFF.load(Ordering::Relaxed).not());
+    }
+
+    #[test]
+    fn build_check() {
+        // SpwmChannelBuilder::default().
+        let init_fn = || -> Result<SpwmChannel, SpwmError> {
+            SpwmChannelBuilder::new(100_000)
+                .on_off_callback(|_: &SpwmState| {})
+                .period_callback(|| {})
+                .freq_hz(100)?
+                .duty_cycle(50)?
+                .build()
+        };
+
+        let r = init_fn();
+
+        assert!(r.is_ok());
+
+        match r {
+            Ok(_) => {}
+            Err(SpwmError::InvalidFrequency) => {}
+            _ => panic!("Unexpected error"),
+        }
     }
 }
