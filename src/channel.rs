@@ -1,58 +1,69 @@
-use crate::{FREQUENCY_DIFFERENCE_REQUIRED, OnOffCallback, PeriodCallback, SpwmError, SpwmState};
+//! Channel management and builder pattern implementation for SPWM.
+//!
+//! This module provides the `SpwmChannel` struct and a type-safe builder pattern
+//! for creating and configuring individual PWM channels.
+
+use crate::{OnOffCallback, PeriodCallback, SpwmError, SpwmState};
 use core::cell::OnceCell;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
+/// Maximum allowed duty cycle percentage.
 const MAX_DUTY_CYCLE: u8 = 100;
 
+/// Minimum ratio between hardware timer frequency and channel frequency.
+/// The hardware timer must run at least 100x faster than the PWM channel frequency.
+const FREQUENCY_DIFFERENCE_REQUIRED: u32 = 100;
+
+/// Builder state indicating frequency needs to be set.
 pub struct SpwmChannelFreqHzBuildState {}
+
+/// Builder state indicating duty cycle needs to be set.
 pub struct SpwmChannelDutyCycleBuildState {}
+
+/// Builder state indicating channel is ready to build.
 pub struct SpwmChannelFinalizedBuildState {}
 
-#[derive(Default)]
+/// Represents a single PWM channel with its configuration and state.
+///
+/// Each channel maintains its own timing counters, callbacks, and enable state.
+/// All fields use atomic operations for thread-safe access from interrupt contexts.
+#[derive(Default, Debug)]
 pub struct SpwmChannel {
+    /// Total ticks in one PWM period
     pub(crate) period_ticks: AtomicU32,
+    /// Number of ticks the output stays "on" in the current period
     pub(crate) on_ticks: AtomicU32,
+    /// Pending `on_ticks` value to be applied at next period start
     pub(crate) update_on_ticks: AtomicU32,
+    /// Current tick counter within the period
     pub(crate) counter: AtomicU32,
+    /// Whether this channel is currently enabled
     pub(crate) enabled: AtomicBool,
+    /// Callback invoked on state changes
     pub(crate) on_off_callback: OnceCell<OnOffCallback>,
+    /// Callback invoked at period completion
     pub(crate) period_callback: OnceCell<PeriodCallback>,
 }
 
 impl SpwmChannel {
-    pub fn enable(&self) {
-        self.enabled.store(true, Ordering::SeqCst);
-
-        if let Some(callback) = self.on_off_callback.get()
-            && self.on_ticks.load(Ordering::Relaxed) != 0
-        {
-            callback(&SpwmState::On);
-        }
-    }
-
-    pub fn disable(&self) {
-        self.enabled.store(false, Ordering::SeqCst);
-        self.counter.store(0, Ordering::SeqCst);
-
-        if let Some(callback) = self.on_off_callback.get() {
-            callback(&SpwmState::Off);
-        }
-    }
-
-    pub fn counter_tick(&self) -> u32 {
+    /// Increments and returns the current tick counter.
+    pub(crate) fn counter_tick(&self) -> u32 {
         self.counter.fetch_add(1, Ordering::SeqCst)
     }
 
-    pub fn counter_reset(&self) {
+    /// Resets the tick counter to zero (called at period boundaries).
+    pub(crate) fn counter_reset(&self) {
         self.counter.store(0, Ordering::SeqCst);
     }
 
-    pub fn set_period_ticks(&self, period_ticks: u32) {
+    /// Sets the total number of ticks in one PWM period.
+    pub(crate) fn set_period_ticks(&self, period_ticks: u32) {
         self.period_ticks.store(period_ticks, Ordering::SeqCst);
     }
 
-    pub fn update_on_ticks(&self, on_ticks: u32) {
+    /// Updates the on-time ticks, applying immediately if disabled or at next period if enabled.
+    pub(crate) fn update_on_ticks(&self, on_ticks: u32) {
         if self.enabled.load(Ordering::Relaxed) {
             self.update_on_ticks.store(on_ticks, Ordering::SeqCst);
         } else {
@@ -61,15 +72,21 @@ impl SpwmChannel {
         }
     }
 
-    pub fn set_on_ticks(&self, on_ticks: u32) {
+    /// Sets the on-time ticks directly (used internally by IRQ handler).
+    pub(crate) fn set_on_ticks(&self, on_ticks: u32) {
         self.on_ticks.store(on_ticks, Ordering::SeqCst);
     }
 
-    pub fn set_on_off_callback(&self, on_off_callback: OnOffCallback) -> Result<(), OnOffCallback> {
+    /// Sets the on/off state change callback. Can only be called once.
+    pub(crate) fn set_on_off_callback(
+        &self,
+        on_off_callback: OnOffCallback,
+    ) -> Result<(), OnOffCallback> {
         self.on_off_callback.set(on_off_callback)
     }
 
-    pub fn set_period_callback(
+    /// Sets the period completion callback. Can only be called once.
+    pub(crate) fn set_period_callback(
         &self,
         period_callback: PeriodCallback,
     ) -> Result<(), PeriodCallback> {
@@ -99,24 +116,27 @@ impl<T> SpwmChannelBuilder<T> {
 }
 
 impl SpwmChannelBuilder<SpwmChannelFreqHzBuildState> {
-    pub(crate) fn new(hardware_freq_hz: u32) -> Self {
-        Self {
+    /// Creates a new channel builder (called internally by `Spwm::create_channel()`).
+    pub fn new(hardware_freq_hz: u32) -> Result<Self, SpwmError> {
+        if hardware_freq_hz == 0 {
+            return Err(SpwmError::InvalidHardwareFrequency);
+        }
+
+        Ok(Self {
             hardware_freq_hz,
             channel_freq_hz: 0,
             duty_cycle: 0,
             on_off_callback: None,
             period_callback: None,
             _phantom: PhantomData,
-        }
+        })
     }
 
     pub fn freq_hz(
         self,
         freq_hz: u32,
     ) -> Result<SpwmChannelBuilder<SpwmChannelDutyCycleBuildState>, SpwmError> {
-        if self.hardware_freq_hz / FREQUENCY_DIFFERENCE_REQUIRED < freq_hz {
-            return Err(SpwmError::InvalidFrequency);
-        }
+        input_frequency_validate(freq_hz, self.hardware_freq_hz)?;
 
         Ok(SpwmChannelBuilder {
             hardware_freq_hz: self.hardware_freq_hz,
@@ -170,4 +190,12 @@ impl SpwmChannelBuilder<SpwmChannelFinalizedBuildState> {
 
         Ok(channel)
     }
+}
+
+fn input_frequency_validate(freq_hz: u32, hardware_freq_hz: u32) -> Result<(), SpwmError> {
+    if freq_hz == 0 || freq_hz > hardware_freq_hz / FREQUENCY_DIFFERENCE_REQUIRED {
+        return Err(SpwmError::InvalidFrequency);
+    }
+
+    Ok(())
 }
