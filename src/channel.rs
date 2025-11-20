@@ -3,7 +3,7 @@
 //! This module provides the `SpwmChannel` struct and a type-safe builder pattern
 //! for creating and configuring individual PWM channels.
 
-use crate::{OnOffCallback, PeriodCallback, SpwmError, SpwmState};
+use crate::{OnOffCallback, PeriodCallback, SpwmError};
 use core::cell::OnceCell;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -104,11 +104,13 @@ pub struct SpwmChannelBuilder<T> {
 }
 
 impl<T> SpwmChannelBuilder<T> {
+    #[must_use]
     pub fn on_off_callback(mut self, on_off_callback: OnOffCallback) -> Self {
         self.on_off_callback = Some(on_off_callback);
         self
     }
 
+    #[must_use]
     pub fn period_callback(mut self, period_callback: PeriodCallback) -> Self {
         self.period_callback = Some(period_callback);
         self
