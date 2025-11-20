@@ -3,7 +3,7 @@
 //! This module provides the `SpwmChannel` struct and a type-safe builder pattern
 //! for creating and configuring individual PWM channels.
 
-use crate::{OnOffCallback, PeriodCallback, SpwmError};
+use crate::{OnOffCallback, PeriodCallback, SpwmError, SpwmState};
 use core::cell::OnceCell;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -92,8 +92,85 @@ impl SpwmChannel {
     ) -> Result<(), PeriodCallback> {
         self.period_callback.set(period_callback)
     }
+
+    pub fn update_frequency(&self, freq_hz: u32, hardware_freq_hz: u32) -> Result<(), SpwmError> {
+        input_frequency_validate(freq_hz, hardware_freq_hz)?;
+        let ticks = hardware_freq_hz / freq_hz;
+        self.set_period_ticks(ticks);
+
+        Ok(())
+    }
+
+    pub fn update_duty_cycle(&self, duty_cycle: u8) -> Result<(), SpwmError> {
+        if duty_cycle > MAX_DUTY_CYCLE {
+            return Err(SpwmError::InvalidDutyCycle);
+        }
+
+        let period_ticks = self.period_ticks.load(Ordering::Relaxed);
+        self.update_on_ticks(period_ticks / 100 * u32::from(duty_cycle));
+
+        Ok(())
+    }
+
+    /// Enables the channel and invokes the on/off callback with the initial state.
+    pub fn enable(&self) -> Result<(), SpwmError> {
+        let expected = false;
+
+        if let Err(value) =
+            self.enabled
+                .compare_exchange(expected, true, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            if value {
+                return Err(SpwmError::AlreadyEnabled);
+            }
+
+            return Err(SpwmError::EnableFailed);
+        }
+
+        if let Some(callback) = self.on_off_callback.get()
+            && self.on_ticks.load(Ordering::Relaxed) != 0
+        {
+            callback(&SpwmState::On);
+        }
+
+        Ok(())
+    }
+
+    /// Disables the channel, resets the counter, and invokes the on/off callback with Off state.
+    pub fn disable(&self) -> Result<(), SpwmError> {
+        let expected = true;
+
+        if let Err(value) =
+            self.enabled
+                .compare_exchange(expected, false, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            if !value {
+                return Err(SpwmError::AlreadyDisabled);
+            }
+
+            return Err(SpwmError::DisableFailed);
+        }
+
+        self.counter.store(0, Ordering::Relaxed);
+
+        if let Some(callback) = self.on_off_callback.get() {
+            callback(&SpwmState::Off);
+        }
+
+        Ok(())
+    }
 }
 
+/// Type-safe builder for creating PWM channels.
+///
+/// The builder uses phantom types to enforce the correct correct configuration order:
+/// 1. Optionally set callbacks
+/// 2. Set frequency (required)
+/// 3. Set duty cycle (required)
+/// 4. Build the channel
+///
+/// # Type Parameter
+/// - `T`: Current build state (`FreqHz`, `DutyCycle`, or `Finalized`)
 pub struct SpwmChannelBuilder<T> {
     hardware_freq_hz: u32,
     channel_freq_hz: u32,
