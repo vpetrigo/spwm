@@ -1,6 +1,13 @@
 [package]
 name = "spwm"
 version = "0.1.0"
+description = "Software PWM for microcontrollers"
 edition = "2024"
+license = "Apache-2.0"
+license-file = "LICENSE.md"
+readme = "README.md"
+homepage = "https://github.com/vpetrigo/spwm"
+repository = "https://github.com/vpetrigo/spwm"
+documentation = "https://docs.rs/spwm"
 
 [dependencies]
