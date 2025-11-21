@@ -33,9 +33,9 @@ use spwm::{Spwm, SpwmState};
 let mut spwm = Spwm::<4>::new(100_000);
 // Create a channel with 1 kHz frequency and 50% duty cycle
 let channel = spwm
-    .create_channel()?
-    .freq_hz(1_000)?
-    .duty_cycle(50)?
+    .create_channel()
+    .freq_hz(1_000)
+    .duty_cycle(50)
     .on_off_callback(|state: &SpwmState| {
         match state {
             SpwmState::On => {
@@ -98,9 +98,9 @@ fn led_callback(state: &SpwmState) {
 
 let mut pwm = Spwm::<1>::new(100_000);
 let channel = pwm
-    .create_channel()?
-    .freq_hz(100)? // 100 Hz PWM frequency
-    .duty_cycle(25)? // 25% brightness
+    .create_channel()
+    .freq_hz(100) // 100 Hz PWM frequency
+    .duty_cycle(25) // 25% brightness
     .on_off_callback(led_callback)
     .period_callback(|| {})
     .build()?;
