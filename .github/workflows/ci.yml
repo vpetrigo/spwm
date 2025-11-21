@@ -42,7 +42,7 @@ jobs:
           toolchain: stable
           components: rustfmt
       - name: Check formatting
-        run: cargo format --check
+        run: cargo fmt --check
 
   build-test:
     runs-on: ubuntu-latest
