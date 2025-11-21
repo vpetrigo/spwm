@@ -79,6 +79,13 @@ impl<const N: usize> Spwm<N> {
         SpwmChannelBuilder::new(self.freq_hz)
     }
 
+    /// Registers a PWM channel and returns its unique identifier.
+    ///
+    /// # Parameters
+    /// - `channel`: The PWM channel to register
+    ///
+    /// # Errors
+    /// Returns `SpwmError::NoChannelSlotAvailable` if all channel slots are already occupied.
     pub fn register_channel(&mut self, channel: SpwmChannel) -> Result<ChannelId, SpwmError> {
         for (i, slot) in self.channel_slots.iter_mut().enumerate() {
             if slot.channel.is_none() {

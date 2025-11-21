@@ -93,6 +93,15 @@ impl SpwmChannel {
         self.period_callback.set(period_callback)
     }
 
+    /// Updates the PWM frequency for this channel.
+    ///
+    /// # Parameters
+    /// - `freq_hz`: Desired PWM frequency in Hz
+    /// - `hardware_freq_hz`: Hardware timer frequency in Hz
+    ///
+    /// # Errors
+    /// Returns `SpwmError::InvalidFrequency` if the frequency is 0 or too high relative
+    /// to the hardware timer frequency (must be at least 100x lower).
     pub fn update_frequency(&self, freq_hz: u32, hardware_freq_hz: u32) -> Result<(), SpwmError> {
         input_frequency_validate(freq_hz, hardware_freq_hz)?;
         let ticks = hardware_freq_hz / freq_hz;
@@ -101,6 +110,13 @@ impl SpwmChannel {
         Ok(())
     }
 
+    /// Updates the duty cycle for this channel.
+    ///
+    /// # Parameters
+    /// - `duty_cycle`: Duty cycle percentage (0-100)
+    ///
+    /// # Errors
+    /// Returns `SpwmError::InvalidDutyCycle` if the duty cycle is greater than 100.
     pub fn update_duty_cycle(&self, duty_cycle: u8) -> Result<(), SpwmError> {
         if duty_cycle > MAX_DUTY_CYCLE {
             return Err(SpwmError::InvalidDutyCycle);
@@ -113,6 +129,10 @@ impl SpwmChannel {
     }
 
     /// Enables the channel and invokes the on/off callback with the initial state.
+    ///
+    /// # Errors
+    /// Returns `SpwmError::AlreadyEnabled` if the channel is already enabled, or
+    /// `SpwmError::EnableFailed` if the atomic compare-exchange operation fails.
     pub fn enable(&self) -> Result<(), SpwmError> {
         let expected = false;
 
@@ -137,6 +157,10 @@ impl SpwmChannel {
     }
 
     /// Disables the channel, resets the counter, and invokes the on/off callback with Off state.
+    ///
+    /// # Errors
+    /// Returns `SpwmError::AlreadyDisabled` if the channel is already disabled, or
+    /// `SpwmError::DisableFailed` if the atomic compare-exchange operation fails.
     pub fn disable(&self) -> Result<(), SpwmError> {
         let expected = true;
 
@@ -236,6 +260,14 @@ impl SpwmChannelBuilder<SpwmChannelDutyCycleBuildState> {
 }
 
 impl SpwmChannelBuilder<SpwmChannelFinalizedBuildState> {
+    /// Builds and validates the PWM channel.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - `SpwmError::InvalidHardwareFrequency` if the hardware frequency is 0
+    /// - `SpwmError::InvalidFrequency` if the channel frequency is invalid
+    /// - `SpwmError::InvalidDutyCycle` if the duty cycle is greater than 100
+    /// - `SpwmError::CallbackSetError` if callbacks are not set or failed to be set
     pub fn build(self) -> Result<SpwmChannel, SpwmError> {
         if self.hardware_freq_hz == 0 {
             return Err(SpwmError::InvalidHardwareFrequency);
