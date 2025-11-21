@@ -278,10 +278,6 @@ impl SpwmChannelBuilder<SpwmChannelFinalizedBuildState> {
         channel.update_frequency(self.channel_freq_hz, self.hardware_freq_hz)?;
         channel.update_duty_cycle(self.duty_cycle)?;
 
-        if self.on_off_callback.is_none() || self.period_callback.is_none() {
-            return Err(SpwmError::CallbackSetError);
-        }
-
         match self.on_off_callback {
             Some(cb) => channel
                 .set_on_off_callback(cb)

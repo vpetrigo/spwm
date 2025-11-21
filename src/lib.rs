@@ -56,17 +56,68 @@ pub type TimerStopCallback = fn();
 /// Unique identifier for a registered channel.
 pub type ChannelId = usize;
 
+/// A container structure used to hold an optional `SpwmChannel`.
+///
+/// # Fields
+///
+/// - `channel`:
+///   An `Option<SpwmChannel>` instance, which can contain either:
+///   - `Some(SpwmChannel)`: A valid `SpwmChannel` object.
+///   - `None`: Indicates the absence of a channel.
 #[derive(Default)]
 struct ChannelSlot {
     channel: Option<SpwmChannel>,
 }
 
+/// A structure for managing Software Pulse Width Modulation (SPWM) channels.
+///
+/// This struct defines a configurable software-based PWM system with a fixed
+/// number of channels. Each channel can be individually controlled via its
+/// corresponding `ChannelSlot`.
+///
+/// # Type Parameters
+///
+/// - `N`: The number of PWM channels, which determines the size of the `channel_slots` array.
+///
+/// # Fields
+/// - `channel_slots`: An array of `ChannelSlot` instances representing individual
+///   PWM channels. Each channel can be configured and utilized independently.
+/// - `freq_hz`: The frequency of the PWM signal in hertz (Hz).
+///
+/// # Example
+///
+/// ```
+/// # use spwm::Spwm;
+/// // Example usage with 4 PWM channels
+/// let spwm: Spwm<4> = Spwm::new(100_000);
+/// ```
+///
+/// # Notes
+///
+/// - The array size for `channel_slots` is determined at compile-time via the generic
+///   `N` parameter, ensuring that the implementation is efficient and tailored to the
+///   user's requirements.
 pub struct Spwm<const N: usize> {
     channel_slots: [ChannelSlot; N],
     freq_hz: u32,
 }
 
 impl<const N: usize> Spwm<N> {
+    /// Creates a new instance with the specified frequency (in Hertz).
+    ///
+    /// # Parameters
+    ///
+    /// - `freq_hz`: The frequency in Hertz to initialize the instance with.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of the struct is initialized with `freq_hz` and default values
+    /// for `channel_slots`.
+    ///
+    /// # Attributes
+    ///
+    /// - `#[must_use]`: Indicates that the returned instance must be used;
+    ///   ignoring it may lead to unexpected behavior or logic bugs.
     #[must_use]
     pub fn new(freq_hz: u32) -> Self {
         Self {
@@ -75,6 +126,26 @@ impl<const N: usize> Spwm<N> {
         }
     }
 
+    /// Creates a new SPWM (Sinusoidal Pulse Width Modulation) channel builder.
+    ///
+    /// This function initializes and returns an `SpwmChannelBuilder` in the
+    /// `SpwmChannelFreqHzBuildState`, which uses the frequency (in Hz) specified
+    /// by the `freq_hz` field of the current instance. The returned builder can
+    /// then be used to configure and build an SPWM channel.
+    ///
+    /// # Returns
+    ///
+    /// An instance of `SpwmChannelBuilder<SpwmChannelFreqHzBuildState>` configured
+    /// with the frequency from the current instance.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use spwm::Spwm;
+    /// let spwm: Spwm<1> = Spwm::new(1_000_000); // Example initialization
+    /// let channel_builder = spwm.create_channel();
+    /// // Further configuration can be done using the returned builder
+    /// ```
     pub fn create_channel(&self) -> SpwmChannelBuilder<SpwmChannelFreqHzBuildState> {
         SpwmChannelBuilder::new(self.freq_hz)
     }
@@ -98,10 +169,48 @@ impl<const N: usize> Spwm<N> {
         Err(SpwmError::NoChannelSlotAvailable)
     }
 
+    /// Retrieves a reference to a `SpwmChannel` associated with the specified `channel_id`,
+    /// if it exists.
+    ///
+    /// # Parameters
+    ///
+    /// - `channel_id`: The identifier of the channel being requested.
+    ///
+    /// # Returns
+    ///
+    /// PWM channel reference if it exists, or `None` otherwise.
+    ///
+    /// # Examples
+    /// ```
+    /// # use spwm::Spwm;
+    /// let mut spwm: Spwm<1> = Spwm::new(1_000_000); // Example initialization
+    /// let led_control_channel = spwm.create_channel()
+    ///     .freq_hz(100)
+    ///     .duty_cycle(5)
+    ///     .on_off_callback(|_| {})
+    ///     .period_callback(|| {}).build();
+    /// let channel = led_control_channel.unwrap();
+    /// let led_control_channel_id = spwm.register_channel(channel).unwrap();
+    /// // Other code here ...
+    /// let led_control_channel = spwm.get_channel(led_control_channel_id).unwrap();
+    /// ```
     pub fn get_channel(&self, channel_id: ChannelId) -> Option<&SpwmChannel> {
         self.channel_slots.get(channel_id)?.channel.as_ref()
     }
 
+    /// Handles the Interrupt Request (IRQ) for Pulse Width Modulation (PWM) channels.
+    ///
+    /// This function is invoked to process the state of all PWM channel slots when an IRQ occurs.
+    /// It ensures that the PWM signals operate, according to their defined periods, on-times, and
+    /// triggers appropriate callbacks when specific events occur.
+    ///
+    /// # Example
+    /// ```
+    /// #[interrupt]
+    /// fn TIMER_IRQ() {
+    ///     spwm.irq_handler();
+    /// }
+    /// ```
     pub fn irq_handler(&self) {
         for slot in &self.channel_slots {
             if let Some(ref channel) = slot.channel

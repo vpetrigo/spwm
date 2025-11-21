@@ -9,4 +9,9 @@ homepage = "https://github.com/vpetrigo/spwm"
 repository = "https://github.com/vpetrigo/spwm"
 documentation = "https://docs.rs/spwm"
 
+exclude = [
+    "tests/*",
+    ".github/"
+]
+
 [dependencies]
