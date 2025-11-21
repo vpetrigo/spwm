@@ -196,76 +196,66 @@ impl<T> SpwmChannelBuilder<T> {
 
 impl SpwmChannelBuilder<SpwmChannelFreqHzBuildState> {
     /// Creates a new channel builder (called internally by `Spwm::create_channel()`).
-    pub fn new(hardware_freq_hz: u32) -> Result<Self, SpwmError> {
-        if hardware_freq_hz == 0 {
-            return Err(SpwmError::InvalidHardwareFrequency);
-        }
-
-        Ok(Self {
+    #[must_use]
+    pub fn new(hardware_freq_hz: u32) -> Self {
+        Self {
             hardware_freq_hz,
             channel_freq_hz: 0,
             duty_cycle: 0,
             on_off_callback: None,
             period_callback: None,
             _phantom: PhantomData,
-        })
+        }
     }
 
-    pub fn freq_hz(
-        self,
-        freq_hz: u32,
-    ) -> Result<SpwmChannelBuilder<SpwmChannelDutyCycleBuildState>, SpwmError> {
-        input_frequency_validate(freq_hz, self.hardware_freq_hz)?;
-
-        Ok(SpwmChannelBuilder {
+    #[must_use]
+    pub fn freq_hz(self, freq_hz: u32) -> SpwmChannelBuilder<SpwmChannelDutyCycleBuildState> {
+        SpwmChannelBuilder {
             hardware_freq_hz: self.hardware_freq_hz,
             channel_freq_hz: freq_hz,
             duty_cycle: 0,
             on_off_callback: self.on_off_callback,
             period_callback: self.period_callback,
             _phantom: PhantomData,
-        })
+        }
     }
 }
 
 impl SpwmChannelBuilder<SpwmChannelDutyCycleBuildState> {
-    pub fn duty_cycle(
-        self,
-        duty_cycle: u8,
-    ) -> Result<SpwmChannelBuilder<SpwmChannelFinalizedBuildState>, SpwmError> {
-        if duty_cycle > MAX_DUTY_CYCLE {
-            return Err(SpwmError::InvalidDutyCycle);
-        }
-
-        Ok(SpwmChannelBuilder {
+    #[must_use]
+    pub fn duty_cycle(self, duty_cycle: u8) -> SpwmChannelBuilder<SpwmChannelFinalizedBuildState> {
+        SpwmChannelBuilder {
             hardware_freq_hz: self.hardware_freq_hz,
             channel_freq_hz: self.channel_freq_hz,
             duty_cycle,
             on_off_callback: self.on_off_callback,
             period_callback: self.period_callback,
             _phantom: PhantomData,
-        })
+        }
     }
 }
 
 impl SpwmChannelBuilder<SpwmChannelFinalizedBuildState> {
     pub fn build(self) -> Result<SpwmChannel, SpwmError> {
-        let period_ticks = self.hardware_freq_hz / self.channel_freq_hz;
-        let on_time = period_ticks / 100 * u32::from(self.duty_cycle);
+        if self.hardware_freq_hz == 0 {
+            return Err(SpwmError::InvalidHardwareFrequency);
+        }
+
         let channel = SpwmChannel::default();
+
+        channel.update_frequency(self.channel_freq_hz, self.hardware_freq_hz)?;
+        channel.update_duty_cycle(self.duty_cycle)?;
 
         if self.on_off_callback.is_none() || self.period_callback.is_none() {
             return Err(SpwmError::CallbackSetError);
         }
 
-        channel.set_period_ticks(period_ticks);
-        channel.update_on_ticks(on_time);
         channel
             .set_on_off_callback(self.on_off_callback.unwrap())
-            .unwrap();
+            .map_err(|_| SpwmError::CallbackSetError)?;
         channel
             .set_period_callback(self.period_callback.unwrap())
-            .unwrap();
+            .map_err(|_| SpwmError::CallbackSetError)?;
 
         Ok(channel)
     }

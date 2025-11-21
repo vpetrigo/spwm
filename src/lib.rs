@@ -68,18 +68,14 @@ pub struct Spwm<const N: usize> {
 
 impl<const N: usize> Spwm<N> {
     #[must_use]
-    pub fn new(
-        freq_hz: u32
-    ) -> Self {
+    pub fn new(freq_hz: u32) -> Self {
         Self {
             freq_hz,
             channel_slots: core::array::from_fn(|_| ChannelSlot::default()),
         }
     }
 
-    pub fn create_channel(
-        &self,
-    ) -> Result<SpwmChannelBuilder<SpwmChannelFreqHzBuildState>, SpwmError> {
+    pub fn create_channel(&self) -> SpwmChannelBuilder<SpwmChannelFreqHzBuildState> {
         SpwmChannelBuilder::new(self.freq_hz)
     }
 
