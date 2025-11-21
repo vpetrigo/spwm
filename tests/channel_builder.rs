@@ -3,11 +3,11 @@ use spwm::{SpwmChannel, SpwmChannelBuilder, SpwmError, SpwmState};
 #[test]
 fn builder_standard() {
     let init_fn = || -> Result<SpwmChannel, SpwmError> {
-        SpwmChannelBuilder::new(100_000)?
+        SpwmChannelBuilder::new(100_000)
             .on_off_callback(|_: &SpwmState| {})
             .period_callback(|| {})
-            .freq_hz(100)?
-            .duty_cycle(50)?
+            .freq_hz(100)
+            .duty_cycle(50)
             .build()
     };
 
@@ -19,11 +19,11 @@ fn builder_standard() {
 #[test]
 fn builder_with_invalid_hardware_frequency() {
     let init_fn = || -> Result<SpwmChannel, SpwmError> {
-        SpwmChannelBuilder::new(0)?
+        SpwmChannelBuilder::new(0)
             .on_off_callback(|_: &SpwmState| {})
             .period_callback(|| {})
-            .freq_hz(100)?
-            .duty_cycle(50)?
+            .freq_hz(100)
+            .duty_cycle(50)
             .build()
     };
 
@@ -36,11 +36,11 @@ fn builder_with_invalid_hardware_frequency() {
 #[test]
 fn builder_with_invalid_frequency() {
     let init_fn = || -> Result<SpwmChannel, SpwmError> {
-        SpwmChannelBuilder::new(100_000)?
+        SpwmChannelBuilder::new(100_000)
             .on_off_callback(|_: &SpwmState| {})
             .period_callback(|| {})
-            .freq_hz(0)?
-            .duty_cycle(50)?
+            .freq_hz(0)
+            .duty_cycle(50)
             .build()
     };
 
@@ -53,11 +53,11 @@ fn builder_with_invalid_frequency() {
 #[test]
 fn builder_with_invalid_duty_cycle() {
     let init_fn = || -> Result<SpwmChannel, SpwmError> {
-        SpwmChannelBuilder::new(100_000)?
+        SpwmChannelBuilder::new(100_000)
             .on_off_callback(|_: &SpwmState| {})
             .period_callback(|| {})
-            .freq_hz(100)?
-            .duty_cycle(101)?
+            .freq_hz(100)
+            .duty_cycle(101)
             .build()
     };
 

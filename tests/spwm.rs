@@ -1,11 +1,13 @@
 use core::sync::atomic::{AtomicBool, AtomicU32};
 use spwm::{ChannelId, OnOffCallback, PeriodCallback, Spwm, SpwmChannel, SpwmError, SpwmState};
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 use std::vec::Vec;
 
 const PERIODS_FOR_TEST: u32 = 50u32;
 static TEST_ON_OFF: AtomicBool = AtomicBool::new(false);
 static TEST_PERIOD: AtomicU32 = AtomicU32::new(0);
+static TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn on_off_test_callback(state: &SpwmState) {
     match state {
@@ -23,9 +25,9 @@ fn test_create_pwm_channel<const N: usize>(
     channel_freq_hz: u32,
     duty_cycle: u8,
 ) -> Result<SpwmChannel, SpwmError> {
-    spwm.create_channel()?
-        .freq_hz(channel_freq_hz)?
-        .duty_cycle(duty_cycle)?
+    spwm.create_channel()
+        .freq_hz(channel_freq_hz)
+        .duty_cycle(duty_cycle)
         .on_off_callback(|_| {})
         .period_callback(|| {})
         .build()
@@ -38,9 +40,9 @@ fn test_create_pwm_channel_with_callbacks<const N: usize>(
     on_off_callback: OnOffCallback,
     period_callback: PeriodCallback,
 ) -> Result<SpwmChannel, SpwmError> {
-    spwm.create_channel()?
-        .freq_hz(channel_freq_hz)?
-        .duty_cycle(duty_cycle)?
+    spwm.create_channel()
+        .freq_hz(channel_freq_hz)
+        .duty_cycle(duty_cycle)
         .on_off_callback(on_off_callback)
         .period_callback(period_callback)
         .build()
@@ -182,6 +184,7 @@ fn construct_spwm_invalid_freq_and_duty_cycle() {
 
 #[test]
 fn on_off_callback_for_single_channel_100_duty_cycle() {
+    let _lock = TEST_LOCK.lock().unwrap();
     TEST_ON_OFF.store(false, Ordering::Relaxed);
     TEST_PERIOD.store(0, Ordering::Relaxed);
 
@@ -223,6 +226,7 @@ fn on_off_callback_for_single_channel_100_duty_cycle() {
 
 #[test]
 fn on_off_callback_for_single_channel_50_duty_cycle() {
+    let _lock = TEST_LOCK.lock().unwrap();
     TEST_ON_OFF.store(false, Ordering::Relaxed);
     TEST_PERIOD.store(0, Ordering::Relaxed);
 
@@ -272,6 +276,7 @@ fn on_off_callback_for_single_channel_50_duty_cycle() {
 
 #[test]
 fn on_off_callback_for_single_channel_0_duty_cycle() {
+    let _lock = TEST_LOCK.lock().unwrap();
     TEST_ON_OFF.store(false, Ordering::Relaxed);
     TEST_PERIOD.store(0, Ordering::Relaxed);
 
@@ -315,6 +320,7 @@ fn on_off_callback_for_single_channel_0_duty_cycle() {
 
 #[test]
 fn on_off_callback_for_single_channel_disabled_50_duty_cycle() {
+    let _lock = TEST_LOCK.lock().unwrap();
     TEST_ON_OFF.store(false, Ordering::Relaxed);
     TEST_PERIOD.store(0, Ordering::Relaxed);
 
