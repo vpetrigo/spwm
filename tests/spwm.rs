@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicBool, AtomicU32};
 use spwm::{ChannelId, OnOffCallback, PeriodCallback, Spwm, SpwmChannel, SpwmError, SpwmState};
-use std::sync::atomic::Ordering;
 use std::sync::Mutex;
+use std::sync::atomic::Ordering;
 use std::vec::Vec;
 
 const PERIODS_FOR_TEST: u32 = 50u32;
