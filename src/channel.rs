@@ -250,12 +250,23 @@ impl SpwmChannelBuilder<SpwmChannelFinalizedBuildState> {
             return Err(SpwmError::CallbackSetError);
         }
 
-        channel
-            .set_on_off_callback(self.on_off_callback.unwrap())
-            .map_err(|_| SpwmError::CallbackSetError)?;
-        channel
-            .set_period_callback(self.period_callback.unwrap())
-            .map_err(|_| SpwmError::CallbackSetError)?;
+        match self.on_off_callback {
+            Some(cb) => channel
+                .set_on_off_callback(cb)
+                .map_err(|_| SpwmError::CallbackSetError)?,
+            None => {
+                return Err(SpwmError::CallbackSetError);
+            }
+        }
+
+        match self.period_callback {
+            Some(cb) => channel
+                .set_period_callback(cb)
+                .map_err(|_| SpwmError::CallbackSetError)?,
+            None => {
+                return Err(SpwmError::CallbackSetError);
+            }
+        }
 
         Ok(channel)
     }
