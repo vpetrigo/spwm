@@ -83,7 +83,8 @@ The hardware timer frequency must be at least 100x the desired PWM channel frequ
 ## Requirements
 
 - Hardware timer that can interrupt at a consistent frequency
-- Timer frequency must be at least 100x the desired PWM channel frequency
+- Timer frequency must be at least 100x the desired PWM channel frequency to achieve 1% duty cycle resolution
+  capabilities
 - Callbacks must be short and non-blocking (they run in interrupt context)
 
 ## Example
