@@ -88,6 +88,9 @@ The hardware timer frequency must be at least 100x the desired PWM channel frequ
 
 ## Example
 
+- [STM32 Nucleo-F302R8 board example](https://github.com/vp-supplementary/nucleo-f302-spwm): 4-channel software PWM
+  output
+
 ```rust
 use spwm::{Spwm, SpwmState};
 
