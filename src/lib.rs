@@ -1,7 +1,5 @@
 //! # SPWM - Software PWM for Embedded Systems
 //!
-//! ------------------------------------------
-//!
 //! A `no_std` Rust library for generating software-based Pulse Width Modulation (PWM) signals on microcontrollers and
 //! embedded systems. This crate provides a flexible, interrupt-driven PWM implementation that doesn't require dedicated
 //! hardware PWM peripherals.
