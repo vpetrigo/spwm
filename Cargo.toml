@@ -8,6 +8,9 @@ readme = "README.md"
 homepage = "https://github.com/vpetrigo/spwm"
 repository = "https://github.com/vpetrigo/spwm"
 documentation = "https://docs.rs/spwm"
+authors = ["Vladimir Petrigo <vladimir.petrigo@gmail.com>"]
+categories = ["no-std", "embedded"]
+keywords = ["pwm", "software-pwm", "microcontroller", "duty-cycle", "led-control"]
 
 exclude = [
     ".github/",
