@@ -1,6 +1,6 @@
 [package]
 name = "spwm"
-version = "0.1.4"
+version = "0.1.5"
 description = "Software PWM for microcontrollers"
 edition = "2024"
 license = "MIT OR Apache-2.0"
@@ -10,8 +10,8 @@ categories = ["no-std", "embedded"]
 keywords = ["pwm", "software-pwm", "microcontroller", "duty-cycle", "led-control"]
 
 exclude = [
-    ".github/",
-    "docs/"
+    "docs/",
+    ".*"
 ]
 
 [dependencies]
