@@ -69,17 +69,6 @@ fn TIMER_IRQ() {
 }
 ```
 
-## How It Works
-
-The SPWM library works by:
-
-1. **Timer-based counting** - Your hardware timer interrupts at a fixed frequency (e.g., 100 kHz)
-2. **Software counters** - Each channel maintains its own tick counter
-3. **State callbacks** - When thresholds are reached, callbacks are invoked to change output states
-4. **Independent channels** - Multiple channels can run simultaneously with different frequencies and duty cycles
-
-The hardware timer frequency must be at least 100x the desired PWM channel frequency to ensure adequate resolution.
-
 ## Requirements
 
 - Hardware timer that can interrupt at a consistent frequency
@@ -92,16 +81,27 @@ The hardware timer frequency must be at least 100x the desired PWM channel frequ
 - [STM32 Nucleo-F302R8 board example](https://github.com/vp-supplementary/nucleo-f302-spwm): 4-channel software PWM
   output
 
+That example configures 4 channels:
+
+- PC9: 10 Hz, 50% duty cycle
+- PC8: 50 Hz, 10% duty cycle
+- PC6: 500 Hz, 50% duty cycle
+- PC5: 250 Hz, 64% duty cycle
+
+Oscillogram that shows PC9 and PC8 output waveforms:
+
+![pwm_oscillogram](docs/oscillogram.png)
+
+Simple LED PWM control example:
+
 ```rust
 use spwm::{Spwm, SpwmState};
 
 static mut LED_STATE: bool = false;
 
 fn led_callback(state: &SpwmState) {
-    unsafe {
-        LED_STATE = matches!(state, SpwmState::On);
-        // Update your LED pin based on LED_STATE
-    }
+    LED_STATE = matches!(state, SpwmState::On);
+    // Update your LED pin based on LED_STATE
 }
 
 let mut pwm = Spwm::<1>::new(100_000);
