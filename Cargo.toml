@@ -10,8 +10,9 @@ repository = "https://github.com/vpetrigo/spwm"
 documentation = "https://docs.rs/spwm"
 
 exclude = [
-    "tests/*",
-    ".github/"
+    "tests/",
+    ".github/",
+    "docs/"
 ]
 
 [dependencies]
