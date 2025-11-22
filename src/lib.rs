@@ -26,6 +26,7 @@
 //!
 //! ```rust
 //! use spwm::{Spwm, SpwmState};
+//! # fn main() -> Result<(), spwm::SpwmError> {
 //! // Create SPWM manager with hardware timer frequency of 100 kHz
 //! // and space for 4 channels
 //! let mut spwm = Spwm::<4>::new(100_000);
@@ -52,11 +53,13 @@
 //!
 //! // Enable the channel to start PWM generation
 //! spwm.get_channel(channel_id).unwrap().enable()?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### In Your Timer Interrupt Handler
 //!
-//! ```rust
+//! ```rust,ignore
 //! #[interrupt]
 //! fn TIMER_IRQ() {
 //!     spwm.irq_handler();
@@ -87,6 +90,7 @@
 //!     }
 //! }
 //!
+//! # fn main() -> Result<(), spwm::SpwmError> {
 //! let mut pwm = Spwm::<1>::new(100_000);
 //! let channel = pwm
 //!     .create_channel()
@@ -98,6 +102,8 @@
 //!
 //! let id = pwm.register_channel(channel)?;
 //! pwm.get_channel(id).unwrap().enable()?;
+//! # Ok(())
+//! # }
 //! ```
 #![no_std]
 mod channel;
@@ -306,7 +312,8 @@ impl<const N: usize> Spwm<N> {
     /// triggers appropriate callbacks when specific events occur.
     ///
     /// # Example
-    /// ```
+    ///
+    /// ```ignore
     /// #[interrupt]
     /// fn TIMER_IRQ() {
     ///     spwm.irq_handler();
