@@ -1,13 +1,10 @@
 [package]
 name = "spwm"
-version = "0.1.3"
+version = "0.1.4"
 description = "Software PWM for microcontrollers"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-readme = "README.md"
-homepage = "https://github.com/vpetrigo/spwm"
 repository = "https://github.com/vpetrigo/spwm"
-documentation = "https://docs.rs/spwm"
 authors = ["Vladimir Petrigo <vladimir.petrigo@gmail.com>"]
 categories = ["no-std", "embedded"]
 keywords = ["pwm", "software-pwm", "microcontroller", "duty-cycle", "led-control"]
