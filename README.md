@@ -1,7 +1,6 @@
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/vpetrigo/spwm/ci.yml)
 [![](https://img.shields.io/crates/v/spwm)](https://crates.io/crates/spwm)
-[![docs.rs](https://img.shields.io/badge/docs.rs-spwm-66c2a5?logo=docs.rs&label=docs.rs)
-](https://docs.rs/spwm)
+[![docs.rs](https://img.shields.io/badge/docs.rs-spwm-66c2a5?logo=docs.rs&label=docs.rs)](https://docs.rs/spwm)
 [![codecov](https://codecov.io/gh/vpetrigo/spwm/graph/badge.svg?token=9KzOP5giI6)](https://codecov.io/gh/vpetrigo/spwm)
 
 # SPWM - Software PWM for Embedded Systems
