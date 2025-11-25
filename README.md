@@ -3,7 +3,7 @@
 [![docs.rs](https://img.shields.io/badge/docs.rs-spwm-66c2a5?logo=docs.rs&label=docs.rs)](https://docs.rs/spwm)
 [![codecov](https://codecov.io/gh/vpetrigo/spwm/graph/badge.svg?token=9KzOP5giI6)](https://codecov.io/gh/vpetrigo/spwm)
 
-# SPWM - Software PWM for Embedded Systems
+# Software PWM for Embedded Systems
 
 ------------------------------------------
 
