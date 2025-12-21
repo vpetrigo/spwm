@@ -24,7 +24,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-soft-pwm = "0.1"
+spwm = "0.1"
 ```
 
 ### Creating a Simple PWM Channel
